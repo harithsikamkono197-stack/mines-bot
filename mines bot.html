@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mines Bot - AAT-DSP Master</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; min-height: 100vh; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .header { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; text-align: center; }
+    .header h1 { color: #58a6ff; margin-bottom: 8px; }
+    .header p { color: #8b949e; font-size: 14px; }
+    .mode-badge { display: inline-block; padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; margin-top: 12px; }
+    .mode-badge.session { background: rgba(88, 166, 255, 0.1); border: 2px solid #58a6ff; color: #58a6ff; }
+    .mode-badge.recovery { background: rgba(210, 153, 32, 0.1); border: 2px solid #d29922; color: #d29922; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    .card h3 { color: #c9d1d9; margin-bottom: 12px; }
+    .time-display { font-size: 24px; font-weight: bold; color: #58a6ff; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .tab { flex: 1; padding: 12px; background: #21262d; border: 2px solid #30363d; border-radius: 6px; color: #8b949e; cursor: pointer; font-weight: 600; text-align: center; }
+    .tab.active { background: #238636; border-color: #238636; color: white; }
+    .tab.recovery { border-color: #d29922; color: #d29922; }
+    .tab.recovery.active { background: #d29922; color: #000; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    label { display: block; color: #8b949e; margin-bottom: 8px; font-size: 14px; }
+    input, select, textarea { width: 100%; padding: 12px; background: #0d1117; border: 2px solid #30363d; border-radius: 6px; color: #c9d1d9; font-size: 14px; margin-bottom: 12px; }
+    button { width: 100%; padding: 12px; border-radius: 6px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+    .btn-primary { background: #238636; color: white; }
+    .btn-primary:hover { background: #2ea44f; }
+    .btn-warning { background: #d29922; color: #000; }
+    .btn-secondary { background: #21262d; border: 2px solid #30363d; color: #8b949e; }
+    .btn-danger { background: #da3633; color: white; }
+    .mines-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 20px 0; max-width: 400px; margin-left: auto; margin-right: auto; }
+    .board-cell { aspect-ratio: 1; background: #0d1117; border: 2px solid #30363d; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; cursor: pointer; color: #c9d1d9; }
+    .board-cell:hover { border-color: #8b949e; }
+    .board-cell.selected { background: rgba(218, 54, 51, 0.2); border-color: #da3633; color: #da3633; }
+    .board-cell.safe-zone { background: rgba(46, 164, 79, 0.2); border-color: #238636; color: #238636; animation: pulse 2s infinite; }
+    .board-cell.recovery-zone { background: rgba(210, 153, 32, 0.2); border-color: #d29922; color: #d29922; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    .schedule-item { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin: 8px 0; display: flex; justify-content: space-between; }
+    .schedule-item.active { border-color: #58a6ff; background: rgba(88, 166, 255, 0.1); }
+    .status-pending { background: rgba(210, 153, 32, 0.1); color: #d29922; padding: 4px 12px; border-radius: 4px; font-size: 12px; }
+    .status-active { background: rgba(88, 166, 255, 0.1); color: #58a6ff; padding: 4px 12px; border-radius: 4px; font-size: 12px; animation: blink 1s infinite; }
+    .status-completed { background: rgba(46, 164, 79, 0.1); color: #238636; padding: 4px 12px; border-radius: 4px; font-size: 12px; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .thinker-feed { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 16px; margin-top: 16px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 300px; overflow-y: auto; }
+    .thinker-entry { margin: 4px 0; padding: 4px 0; }
+    .thinker-entry.info { color: #8b949e; }
+    .thinker-entry.success { color: #238636; }
+    .thinker-entry.warning { color: #d29922; }
+    .thinker-entry.ai { color: #a371f7; }
+    .picks-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 12px; margin: 16px 0; }
+    .pick-item { background: #0d1117; border: 2px solid #238636; border-radius: 6px; padding: 16px; text-align: center; }
+    .pick-item.recovery { border-color: #d29922; }
+    .pick-value { color: #238636; font-size: 20px; font-weight: bold; }
+    .pick-item.recovery .pick-value { color: #d29922; }
+    .warning-box { background: rgba(210, 153, 32, 0.1); border: 2px solid #d29922; border-radius: 6px; padding: 16px; margin: 16px 0; }
+    .warning-box p { color: #d29922; margin: 0; }
+    .recovery-analysis { background: #21262d; border: 2px solid #a371f7; border-radius: 6px; padding: 20px; margin: 16px 0; display: none; }
+    .recovery-analysis.active { display: block; }
+    .risk-bar { height: 24px; background: #0d1117; border-radius: 6px; overflow: hidden; }
+    .risk-fill { height: 100%; border-radius: 6px; }
+    .risk-fill.low { background: #238636; width: 25%; }
+    .risk-fill.medium { background: #d29922; width: 50%; }
+    .risk-fill.high { background: #f0883e; width: 75%; }
+    .risk-fill.extreme { background: #da3633; width: 100%; }
+    .result-section { background: #21262d; border: 2px solid #238636; border-radius: 6px; padding: 20px; margin: 16px 0; display: none; }
+    .result-section.active { display: block; }
+    .result-section.recovery-result { border-color: #d29922; }
+    .hidden { display: none !important; }
+    .active-session-banner { background: rgba(88, 166, 255, 0.2); border: 2px solid #58a6ff; border-radius: 6px; padding: 16px; margin-bottom: 20px; text-align: center; display: none; }
+    .active-session-banner.active { display: block; animation: pulse 2s infinite; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="active-session-banner" id="activeSessionBanner">
+      <h3>🔥 SESSION ACTIVE NOW!</h3>
+      <p id="activeSessionText">Set is now active!</p>
+      <button class="btn-primary" onclick="scrollToGenerator()">Generate Picks Now</button>
+    </div>
+
+    <div class="header">
+      <h1>🔐 Mines Bot - AAT-DSP Master</h1>
+      <p>Advanced Anti-Tracking & Dynamic Session Protocol</p>
+      <div class="mode-badge session" id="modeIndicator">SESSION MODE</div>
+    </div>
+
+    <div class="card">
+      <h3>📍 Dar es Salaam Time (EAT)</h3>
+      <div class="time-display" id="currentTime">Loading...</div>
+      <div id="nextSessionDisplay" style="margin-top: 10px; color: #d29922;"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('session')">📅 Session Board</button>
+      <button class="tab recovery" onclick="switchTab('recovery')">🛡️ Recovery Board</button>
+    </div>
+
+    <div id="sessionTab" class="tab-content active">
+      <div class="card">
+        <h3>📅 Session Protocol</h3>
+        <label>Start Time (EAT)</label>
+        <input type="time" id="sessionStartTime" value="22:00">
+        <button class="btn-primary" id="btnStartSession" onclick="startSession()">🚀 Start Session</button>
+        <button class="btn-secondary hidden" id="btnCancelSession" onclick="cancelSession()">Cancel</button>
+        <div id="sessionSchedule"></div>
+      </div>
+
+      <div class="card" id="generatorCard">
+        <h3>🎯 Generate Picks</h3>
+        <div id="currentSetDisplay" style="color: #8b949e; margin-bottom: 10px;">No active set</div>
+        <label>Mine Mode</label>
+        <select id="sessionMode">
+          <option value="1">1 Mine (10 picks)</option>
+          <option value="2">2 Mines (8 picks)</option>
+          <option value="3">3 Mines (5 picks)</option>
+          <option value="5">5 Mines (3 picks)</option>
+          <option value="7">7 Mines (2 picks)</option>
+        </select>
+        <label>Mine Locations</label>
+        <textarea id="sessionMines" rows="2" placeholder="A1, B3, C5"></textarea>
+        <div class="mines-board" id="sessionBoard"></div>
+        <button class="btn-primary" onclick="generateSessionPicks()">✅ Generate Session Picks</button>
+        <button class="btn-secondary" onclick="clearSessionBoard()">Clear</button>
+      </div>
+
+      <div class="result-section" id="sessionResult">
+        <h3>✅ Session Picks</h3>
+        <div class="picks-grid" id="sessionPicksGrid"></div>
+        <div class="warning-box"><p>⚠️ Wait 2-4 seconds between picks.</p></div>
+      </div>
+    </div>
+
+    <div id="recoveryTab" class="tab-content">
+      <div class="card">
+        <h3>🛡️ Recovery Protocol</h3>
+        <div class="warning-box"><p>⚠️ Submit mine locations from loss for AI analysis.</p></div>
+        <label>Mine Locations from Loss</label>
+        <textarea id="recoveryMines" rows="3" placeholder="A1, B3, C5, D2, E4"></textarea>
+        <div class="mines-board" id="recoveryBoard"></div>
+        <button class="btn-primary" style="background: #58a6ff;" onclick="submitRecoveryAnalysis()">🔍 AI Analysis</button>
+        <button class="btn-secondary" onclick="clearRecoveryBoard()">Clear</button>
+
+        <div class="recovery-analysis" id="recoveryAnalysis">
+          <h4>🤖 AI Risk Assessment</h4>
+          <div>Risk: <span id="riskLevelText">--</span></div>
+          <div class="risk-bar"><div class="risk-fill" id="riskFill"></div></div>
+          <div>Mode: <span id="aiMode">--</span></div>
+          <div>Picks: <span id="aiPickCount">--</span></div>
+          <div>Reason: <span id="aiRationale">--</span></div>
+          <button class="btn-warning" onclick="generateRecoveryPicks()">🛡️ Generate Recovery Picks</button>
+        </div>
+
+        <div class="result-section recovery-result" id="recoveryResult">
+          <h3>🛡️ Recovery Picks</h3>
+          <div class="picks-grid" id="recoveryPicksGrid"></div>
+          <div class="warning-box"><p>⚠️ Wait 3-5 seconds between picks.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🤖 AI Thinker</h3>
+      <div class="thinker-feed" id="thinkerFeed">
+        <div class="thinker-entry info">[SYSTEM] Ready</div>
+      </div>
+    </div>
+
+    <button class="btn-danger" onclick="protocolReset()">🔄 PROTOCOL RESET</button>
+  </div>
+
+  <script>
+    // State variables
+    var currentMode = 'session';
+    var sessionActive = false;
+    var sessionPlan = null;
+    var activeSet = null;
+    var recoveryAnalyzed = false;
+    var recoveryData = null;
+
+    // Update time and check sessions
+    function updateTime() {
+      var now = new Date();
+      document.getElementById('currentTime').textContent = now.toLocaleString('en-GB', { timeZone: 'Africa/Dar_es_Salaam' });
+      checkActiveSession();
+    }
+
+    // Create interactive board
+    function createBoard(boardId) {
+      var board = document.getElementById(boardId);
+      if (!board) return;
+      board.innerHTML = '';
+      var rows = ['A', 'B', 'C', 'D', 'E'];
+      var cols = ['1', '2', '3', '4', '5'];
+      for (var i = 0; i < rows.length; i++) {
+        for (var j = 0; j < cols.length; j++) {
+          var cell = document.createElement('div');
+          cell.className = 'board-cell';
+          cell.textContent = rows[i] + cols[j];
+          cell.dataset.coord = rows[i] + cols[j];
+          cell.onclick = function() { toggleCell(this, boardId); };
+          board.appendChild(cell);
+        }
+      }
+    }
+
+    // Toggle cell selection
+    function toggleCell(cell, boardId) {
+      cell.classList.toggle('selected');
+      var isSelected = cell.classList.contains('selected');
+      logThinker(isSelected ? 'warning' : 'info', (boardId === 'recoveryBoard' ? '[RECOVERY] ' : '[SESSION] ') + (isSelected ? 'Marked: ' : 'Unmarked: ') + cell.dataset.coord);
+    }
+
+    // Switch between tabs
+    function switchTab(tab) {
+      currentMode = tab;
+      var tabs = document.querySelectorAll('.tab-content');
+      for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+      var tabButtons = document.querySelectorAll('.tab');
+      for (var i = 0; i < tabButtons.length; i++) tabButtons[i].classList.remove('active');
+      if (tab === 'session') {
+        document.getElementById('sessionTab').classList.add('active');
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        document.getElementById('modeIndicator').textContent = 'SESSION MODE';
+        document.getElementById('modeIndicator').className = 'mode-badge session';
+      } else {
+        document.getElementById('recoveryTab').classList.add('active');
+        document.querySelectorAll('.tab')[1].classList.add('active');
+        document.getElementById('modeIndicator').textContent = 'RECOVERY MODE';
+        document.getElementById('modeIndicator').className = 'mode-badge recovery';
+      }
+    }
+
+    // Check if a session should be active
+    function checkActiveSession() {
+      if (!sessionActive || !sessionPlan) return;
+      var now = new Date();
+      var currentTime = now.getHours() * 60 + now.getMinutes();
+      for (var i = 0; i < sessionPlan.length; i++) {
+        var set = sessionPlan[i];
+        var parts = set.time.split(':');
+        var setTime = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        if (currentTime >= setTime && currentTime < setTime + 15 && set.status !== 'completed') {
+          if (activeSet !== i) {
+            activeSet = i;
+            activateSet(i);
+          }
+          break;
+        }
+      }
+      updateNextSessionDisplay();
+    }
+
+    // Activate a session set
+    function activateSet(index) {
+      var set = sessionPlan[index];
+      document.getElementById('activeSessionBanner').classList.add('active');
+      document.getElementById('activeSessionText').textContent = 'Set ' + set.set + ' (' + set.mode + '-Mine) is ACTIVE!';
+      document.getElementById('currentSetDisplay').textContent = '🔥 ACTIVE: Set ' + set.set + ' - ' + set.mode + '-Mine';
+      document.getElementById('currentSetDisplay').style.color = '#58a6ff';
+      document.getElementById('sessionMode').value = set.mode;
+      set.status = 'active';
+      updateScheduleDisplay();
+      logThinker('success', '🔥 SET ' + set.set + ' ACTIVE! Time: ' + set.time);
+    }
+
+    // Show countdown to next session
+    function updateNextSessionDisplay() {
+      if (!sessionActive || !sessionPlan) {
+        document.getElementById('nextSessionDisplay').textContent = '';
+        return;
+      }
+      var now = new Date();
+      var currentTime = now.getHours() * 60 + now.getMinutes();
+      for (var i = 0; i < sessionPlan.length; i++) {
+        if (sessionPlan[i].status === 'pending') {
+          var parts = sessionPlan[i].time.split(':');
+          var setTime = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+          var diff = setTime - currentTime;
+          if (diff > 0) {
+            var hours = Math.floor(diff / 60);
+            var mins = diff % 60;
+            document.getElementById('nextSessionDisplay').textContent = '⏰ Next: ' + (hours > 0 ? hours + 'h ' : '') + mins + 'min (' + sessionPlan[i].time + ')';
+            return;
+          }
+        }
+      }
+      document.getElementById('nextSessionDisplay').textContent = 'All sessions completed!';
+    }
+
+    // Scroll to generator
+    function scrollToGenerator() {
+      document.getElementById('generatorCard').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Start a new session
+    function startSession() {
+      var startTime = document.getElementById('sessionStartTime').value;
+      if (!startTime) { alert('Set a start time'); return; }
+      sessionActive = true;
+      var modes = ['1', '2', '3', '5'];
+      // Shuffle modes
+      for (var i = modes.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var temp = modes[i];
+        modes[i] = modes[j];
+        modes[j] = temp;
+      }
+      sessionPlan = [];
+      for (var i = 0; i < 4; i++) {
+        sessionPlan.push({
+          set: i + 1,
+          mode: modes[i],
+          time: addMinutes(startTime, i * 15),
+          status: 'pending'
+        });
+      }
+      document.getElementById('btnStartSession').classList.add('hidden');
+      document.getElementById('btnCancelSession').classList.remove('hidden');
+      updateScheduleDisplay();
+      logThinker('success', 'Session started. 4 sets scheduled.');
+    }
+
+    // Add minutes to time
+    function addMinutes(timeStr, mins) {
+      var parts = timeStr.split(':');
+      var total = parseInt(parts[0]) * 60 + parseInt(parts[1]) + mins;
+      var h = Math.floor(total / 60) % 24;
+      var m = total % 60;
+      return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    }
+
+    // Update schedule display
+    function updateScheduleDisplay() {
+      var display = document.getElementById('sessionSchedule');
+      if (!sessionPlan) { display.innerHTML = ''; return; }
+      var html = '';
+      for (var i = 0; i < sessionPlan.length; i++) {
+        var set = sessionPlan[i];
+        var isActive = activeSet === i;
+        html += '<div class="schedule-item ' + (isActive ? 'active' : '') + '"><span>Set ' + set.set + ': ' + set.mode + '-Mine @ ' + set.time + '</span><span class="status-' + set.status + '">' + set.status.toUpperCase() + '</span></div>';
+      }
+      display.innerHTML = html;
+    }
+
+    // Cancel session
+    function cancelSession() {
+      sessionActive = false;
+      sessionPlan = null;
+      activeSet = null;
+      document.getElementById('btnStartSession').classList.remove('hidden');
+      document.getElementById('btnCancelSession').classList.add('hidden');
+      document.getElementById('sessionSchedule').innerHTML = '';
+      document.getElementById('activeSessionBanner').classList.remove('active');
+      document.getElementById('nextSessionDisplay').textContent = '';
+      document.getElementById('currentSetDisplay').textContent = 'No active set';
+      document.getElementById('currentSetDisplay').style.color = '#8b949e';
+      logThinker('info', 'Session cancelled.');
+    }
+
+    // Generate session picks
+    function generateSessionPicks() {
+      var mode = document.getElementById('sessionMode').value;
+      var maxPicks = mode === '1' ? 10 : mode === '2' ? 8 : mode === '3' ? 5 : mode === '5' ? 3 : 2;
+      var picks = generatePicks(maxPicks, 'session');
+      displayPicks(picks, 'sessionPicksGrid', 'sessionResult', false);
+      highlightBoard(picks, 'sessionBoard', 'safe-zone');
+      if (activeSet !== null && sessionPlan[activeSet]) {
+        sessionPlan[activeSet].status = 'completed';
+        updateScheduleDisplay();
+      }
+      logThinker('success', 'Generated ' + picks.length + ' picks for ' + mode + '-Mine');
+    }
+
+    // Submit recovery analysis
+    function submitRecoveryAnalysis() {
+      var minesInput = document.getElementById('recoveryMines').value.toUpperCase();
+      var boardMines = [];
+      document.querySelectorAll('#recoveryBoard .selected').forEach(function(c) { boardMines.push(c.dataset.coord); });
+      var textMines = minesInput.match(/[A-E][1-5]/g) || [];
+      var allMines = textMines.concat(boardMines.filter(function(m) { return textMines.indexOf(m) === -1; }));
+      if (allMines.length === 0) { alert('Enter mine locations'); return; }
+      logThinker('ai', 'Analyzing ' + allMines.length + ' mines: ' + allMines.join(', '));
+      recoveryData = analyzeRisk(allMines);
+      document.getElementById('riskLevelText').textContent = recoveryData.riskLevel.toUpperCase();
+      document.getElementById('riskFill').className = 'risk-fill ' + recoveryData.riskClass;
+      document.getElementById('aiMode').textContent = recoveryData.recommendedMode + '-Mine';
+      document.getElementById('aiPickCount').textContent = recoveryData.safePicks + ' picks';
+      document.getElementById('aiRationale').textContent = recoveryData.rationale;
+      document.getElementById('recoveryAnalysis').classList.add('active');
+      recoveryAnalyzed = true;
+      logThinker('ai', 'Risk: ' + recoveryData.riskLevel + ' | Mode: ' + recoveryData.recommendedMode + '-Mine');
+    }
+
+    // Analyze risk level
+    function analyzeRisk(mines) {
+      var rowCounts = {}, colCounts = {};
+      mines.forEach(function(m) {
+        rowCounts[m[0]] = (rowCounts[m[0]] || 0) + 1;
+        colCounts[m[1]] = (colCounts[m[1]] || 0) + 1;
+      });
+      var maxRow = 0, maxCol = 0;
+      for (var r in rowCounts) maxRow = Math.max(maxRow, rowCounts[r]);
+      for (var c in colCounts) maxCol = Math.max(maxCol, colCounts[c]);
+      var boundaryHits = mines.filter(function(m) { return m[0] === 'A' || m[0] === 'E' || m[1] === '1' || m[1] === '5'; }).length;
+      if (boundaryHits >= 3 || maxRow >= 3 || maxCol >= 3) return { riskLevel: 'extreme', riskClass: 'extreme', recommendedMode: '1', safePicks: 3, rationale: 'High boundary concentration. Minimum exposure.', mines: mines };
+      if (mines.length >= 4 || maxRow >= 2) return { riskLevel: 'high', riskClass: 'high', recommendedMode: '1', safePicks: 5, rationale: 'Clustered traps. Lowest risk mode.', mines: mines };
+      if (mines.length >= 2) return { riskLevel: 'medium', riskClass: 'medium', recommendedMode: '2', safePicks: 4, rationale: 'Moderate density. Reduced picks.', mines: mines };
+      return { riskLevel: 'low', riskClass: 'low', recommendedMode: '3', safePicks: 3, rationale: 'Scattered pattern. Safety margin.', mines: mines };
+    }
+
+    // Generate recovery picks
+    function generateRecoveryPicks() {
+      if (!recoveryAnalyzed || !recoveryData) { alert('Submit mine analysis first'); return; }
+      var picks = generatePicks(recoveryData.safePicks, 'recovery', recoveryData.mines);
+      displayPicks(picks, 'recoveryPicksGrid', 'recoveryResult', true);
+      highlightBoard(picks, 'recoveryBoard', 'recovery-zone');
+      logThinker('success', 'Generated ' + picks.length + ' recovery picks');
+    }
+
+    // Generate smart picks
+    function generatePicks(count, type, avoidMines) {
+      var picks = [];
+      var safeRows = type === 'recovery' ? ['B', 'C', 'D'] : ['B', 'C', 'D', 'E'];
+      var safeCols = ['1', '2', '3', '4', '5'];
+      var danger = avoidMines || [];
+      var attempts = 0;
+      while (picks.length < count && attempts < 1000) {
+        attempts++;
+        var row = safeRows[Math.floor(Math.random() * safeRows.length)];
+        var col = safeCols[Math.floor(Math.random() * safeCols.length)];
+        var pick = row + col;
+        if (picks.indexOf(pick) !== -1) continue;
+        if (danger.indexOf(pick) !== -1) continue;
+        if (col === '3' && Math.random() > 0.3) continue;
+        picks.push(pick);
+      }
+      return picks;
+    }
+
+    // Display picks
+    function displayPicks(picks, gridId, sectionId, isRecovery) {
+      var grid = document.getElementById(gridId);
+      var section = document.getElementById(sectionId);
+      grid.innerHTML = picks.map(function(p, i) { return '<div class="pick-item ' + (isRecovery ? 'recovery' : '') + '"><div>Pick ' + (i + 1) + '</div><div class="pick-value">' + p + '</div></div>'; }).join('');
+      section.classList.add('active');
+      section.style.display = 'block';
+    }
+
+    // Highlight board cells
+    function highlightBoard(picks, boardId, className) {
+      document.querySelectorAll('#' + boardId + ' .board-cell').forEach(function(cell) {
+        cell.classList.remove('safe-zone', 'recovery-zone');
+        if (picks.indexOf(cell.dataset.coord) !== -1) cell.classList.add(className);
+      });
+    }
+
+    // Clear session board
+    function clearSessionBoard() {
+      document.querySelectorAll('#sessionBoard .board-cell').forEach(function(c) { c.classList.remove('selected', 'safe-zone'); });
+      document.getElementById('sessionMines').value = '';
+      document.getElementById('sessionResult').classList.remove('active');
+      document.getElementById('sessionResult').style.display = 'none';
+      logThinker('info', 'Session board cleared');
+    }
+
+    // Clear recovery board
+    function clearRecoveryBoard() {
+      document.querySelectorAll('#recoveryBoard .board-cell').forEach(function(c) { c.classList.remove('selected', 'recovery-zone'); });
+      document.getElementById('recoveryMines').value = '';
+      document.getElementById('recoveryAnalysis').classList.remove('active');
+      document.getElementById('recoveryResult').classList.remove('active');
+      document.getElementById('recoveryResult').style.display = 'none';
+      recoveryAnalyzed = false;
+      recoveryData = null;
+      logThinker('info', 'Recovery board cleared');
+    }
+
+    // Log to thinker
+    function logThinker(type, message) {
+      var feed = document.getElementById('thinkerFeed');
+      var entry = document.createElement('div');
+      entry.className = 'thinker-entry ' + type;
+      entry.textContent = '[' + new Date().toLocaleTimeString('en-GB') + '] ' + message;
+      feed.appendChild(entry);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    // Reset everything
+    function protocolReset() {
+      if (confirm('Clear all data?')) location.reload();
+    }
+
+    // Initialize
+    window.onload = function() {
+      updateTime();
+      setInterval(updateTime, 1000);
+      createBoard('sessionBoard');
+      createBoard('recoveryBoard');
+      logThinker('info', 'System ready');
+    };
+  </script>
+</body>
+</html>
